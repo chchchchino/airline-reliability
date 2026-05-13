@@ -1,0 +1,32 @@
+@startuml AirlineReliability_C4_Containers
+title Container diagram — Airline reliability (Gradio + LangGraph + MCP + RAG)
+
+' C4-PlantUML: https://github.com/plantuml-stdlib/C4-PlantUML
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+Person(analyst, "User", "Asks natural-language questions about airline delay reporting data.")
+
+System_Boundary(system, "Airline reliability system") {
+    Container(ui, "Gradio chat UI", "Python / Gradio", "Browser chat; maps history to LangChain messages and invokes the agent.")
+    Container(agent, "LangGraph agent", "Python / LangGraph + LangChain OpenAI", "gpt-4o-mini with tools; cycles model → tools until done.")
+    ContainerDb(csv, "Delay causes CSV", "CSV file", "Airline_Delay_Cause.csv — bundled next to app.py under src/airline_reliability/.")
+    ContainerDb(chroma, "Chroma vector store", "Chroma persistent DB", "Local embeddings index under .chroma_airline_reliability/; rebuilt on CSV mtime / index version.")
+    Container(mcp, "MCP server (stdio)", "Python / FastMCP", "Child process: schema tool + semantic search tool over the CSV via RAG.")
+}
+
+System_Ext(openai_chat, "OpenAI Chat API", "HTTPS, REST")
+System_Ext(openai_embed, "OpenAI Embeddings API", "HTTPS, REST")
+
+Rel(analyst, ui, "Chats with", "HTTPS")
+Rel(ui, agent, "Invokes", "in-process async")
+Rel(agent, openai_chat, "Chat completions + tool calls", "HTTPS")
+Rel(agent, mcp, "MCP stdio client", "JSON-RPC over pipes\n(langchain-mcp-adapters)")
+Rel(mcp, csv, "Reads rows for chunking / schema", "filesystem")
+Rel(mcp, chroma, "Queries / builds index", "filesystem + local RPC")
+Rel(mcp, openai_embed, "Embedding vectors for index + queries", "HTTPS")
+
+SHOW_LEGEND()
+@enduml

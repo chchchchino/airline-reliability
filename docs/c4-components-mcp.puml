@@ -1,0 +1,29 @@
+@startuml AirlineReliability_C4_Components_MCP
+title Component diagram — MCP server and RAG (inside stdio process)
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+Container_Boundary(mcp_proc, "MCP server process (airline_reliability.mcp_server)") {
+    Component(fastmcp, "FastMCP runtime", "mcp / FastMCP", "stdio transport; registers tools for the MCP protocol.")
+    Component(tool_schema, "get_airline_delay_dataset_schema", "Python", "Returns column names and short dataset description (no row dump).")
+    Component(tool_search, "search_airline_delay_causes", "Python", "Natural-language RAG: delegates to the index layer.")
+    Component(rag, "rag_index", "Python / tiktoken + Chroma", "Chunks CSV, truncates to embedding token limits, batches embedding writes, runs similarity search.")
+}
+
+ContainerDb(csv, "Airline_Delay_Cause.csv", "CSV", "Bundled with package; default path next to app.py.")
+ContainerDb(chroma, "Chroma persistent store", "SQLite + vectors", ".chroma_airline_reliability/")
+System_Ext(openai_embed, "OpenAI Embeddings", "HTTPS")
+
+Rel(fastmcp, tool_schema, "Exposes")
+Rel(fastmcp, tool_search, "Exposes")
+Rel(tool_schema, csv, "Reads header", "filesystem")
+Rel(tool_search, rag, "Uses")
+Rel(rag, csv, "Reads & chunks", "filesystem")
+Rel(rag, chroma, "get_or_create_collection / query", "local")
+Rel(rag, openai_embed, "text-embedding-3-small (default)", "HTTPS")
+
+SHOW_LEGEND()
+@enduml
